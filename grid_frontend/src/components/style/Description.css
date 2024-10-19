@@ -1,0 +1,39 @@
+/* Freshness.css */
+
+/* Existing styles */
+.wrap{
+    display:flex;
+}
+.description-container {
+    padding: 20px;
+    text-align: center;
+    background-color:'#f0f8ff'; /* Light background for the freshness page */
+   
+   
+}
+
+.description-container h2 {
+    color: #50394c; /* Title color */
+    font-size: 32px; /* Larger font size for headings */
+}
+
+.description-container p {
+    color: #b2b2b2; /* Darker text for better readability */
+    font-size: 18px; /* Standard font size */
+    line-height: 1.6; /* Improved line spacing */
+}
+
+
+.image {
+
+    padding-right: 200px;
+    
+    
+    
+}
+
+/* Optional: If you want to set a fixed width for the image */
+.image img {
+    max-width: 100%; /* Ensure image is responsive */
+    height: auto; /* Maintain aspect ratio */
+}

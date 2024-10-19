@@ -1,0 +1,50 @@
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%; /* Make navbar span the full width of the screen */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color:  #50394c;
+    padding: 10px 20px;
+    z-index: 1000;
+    box-shadow: 0 4px 2px -2px gray; /* Adds a subtle shadow for better appearance */
+}
+
+.navbar-heading {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0; /* Removes default margin */
+    position: absolute;
+    left: 20px; /* Ensures it's in the top-left corner */
+}
+
+.nav-list {
+    list-style: none;
+    display: flex;
+    justify-content: center; /* Center the list */
+    flex-grow: 1; /* Ensures the list grows and stays centered */
+    margin: 0;
+    padding: 0;
+}
+
+.nav-item {
+    margin: 0 15px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.nav-item a {
+    color: white; /* Ensure link color is white */
+    text-decoration: none; /* Remove underline from links */
+}
+
+.nav-item a:hover {
+    text-decoration: underline; /* Simple hover effect */
+}
+
+.nav-item a:visited {
+    color: white; /* Ensure visited link color is also white */
+}
