@@ -8,6 +8,8 @@ import io
 from io import BytesIO
 import requests
 import os
+from transformers import BlipProcessor, BlipForConditionalGeneration
+
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -17,7 +19,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load the OCR model and tokenizer
 ocr_save_directory = "./saved_model_GOT_OCR2_0"
-
 ocr_tokenizer = AutoTokenizer.from_pretrained(ocr_save_directory, trust_remote_code=True, use_auth_token=True, verify=False)
 ocr_model = AutoModel.from_pretrained(ocr_save_directory, trust_remote_code=True)
 
@@ -37,6 +38,12 @@ classification_model.load_state_dict(torch.load(classification_checkpoint_path, 
 classification_model = classification_model.to(device)
 classification_model.eval()  # Set the model to evaluation mode
 
+
+# Load the saved model and processor
+object_detection_processor = BlipProcessor.from_pretrained("./blip-image-captioning-large-processor")
+object_detection_model = BlipForConditionalGeneration.from_pretrained("./blip-image-captioning-large-model").to("cuda")
+
+
 # Load class labels from the JSON file for classification
 with open('class_labels.json', 'r') as f:
     class_labels = json.load(f)
@@ -54,8 +61,34 @@ def process_classification_image(image_bytes):
     return classification_transform(image).unsqueeze(0).to(device)
 
 
-# Route to handle OCR requests
+@app.route('/caption', methods=['POST'])
+def caption_image():
+    # Check if an image file is provided in the request
+    if 'image' not in request.files:
+        return jsonify({"error": "No image provided"}), 400
 
+    file = request.files['image']
+    img_bytes = file.read()  # Read the image file as bytes
+    
+    # Open the image using PIL
+    raw_image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+
+    text = request.form.get('text', '')  # Optional text for conditional captioning
+
+    if text:
+        # Conditional captioning
+        inputs = object_detection_processor(raw_image, text, return_tensors="pt").to("cuda")
+    else:
+        # Unconditional captioning
+        inputs = object_detection_processor(raw_image, return_tensors="pt").to("cuda")
+
+    # Generate caption
+    out = object_detection_model.generate(**inputs)
+    caption = object_detection_processor.decode(out[0], skip_special_tokens=True)
+
+    return jsonify({"caption": caption})
+
+# Route to handle OCR requests
 @app.route('/ocr', methods=['POST'])
 def ocr():
     if 'image' not in request.files:
