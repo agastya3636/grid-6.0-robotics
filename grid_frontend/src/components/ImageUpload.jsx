@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import './style/ImageUpload.css'; // Adjust path if necessary
 
-const ImageUpload = () => {
+const ImageUpload = ({endpoint}) => {
   const [image, setImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [responseData, setResponseData] = useState(''); // State for backend response
 
   // Handle the file selection
   const handleFileChange = (e) => {
@@ -23,37 +24,34 @@ const ImageUpload = () => {
     setImage(null);
     setPreviewUrl(''); // Clear the preview URL
     setMessage(''); // Clear the message when removing
+    setResponseData(''); // Clear previous backend response
   };
 
   // Submit the image to the backend server
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!image) {
-      setMessage('Please select an image to upload.');
-      setIsError(true);
-      return;
-    }
-
+  const handleSubmit = async (file) => {
     const formData = new FormData();
-    formData.append('image', image);
+    formData.append('image', file);
 
     try {
-      const response = await fetch('http://localhost:5000/upload', { // Change to your backend API URL
+      const response = await fetch(`/api/${endpoint}`, {
         method: 'POST',
         body: formData,
       });
 
-      if (response.ok) {
-        setMessage('Image uploaded successfully!');
-        setIsError(false);
-      } else {
-        setMessage('Failed to upload image.');
-        setIsError(true);
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
       }
+
+      const data = await response.json();
+      console.log(data)
+      setResponseData(data['json']['parts'][0]['text']); // Store the backend response data
+      setMessage('Image uploaded successfully!');
+      setIsError(false);
+      
     } catch (error) {
-      setMessage('Error uploading image.');
+      setMessage('Failed to upload image.');
       setIsError(true);
+      console.error('Error:', error);
     }
   };
 
@@ -68,10 +66,10 @@ const ImageUpload = () => {
             <div className="image-preview">
               <img src={previewUrl} alt="Preview" />
             </div>
-            <button className="upload-button" onClick={handleSubmit}>Upload Image</button>
+            <button className="upload-button" onClick={() => handleSubmit(image)}>Upload Image</button>
           </>
         )}
-        
+
         {/* File input with label */}
         <div className="file-input-container">
           <input 
@@ -91,6 +89,15 @@ const ImageUpload = () => {
       {message && (
         <p className={isError ? 'error-message' : 'success-message'}>{message}</p>
       )}
+
+      {/* Display backend response */}
+      {responseData && (
+        <div className="response-data" style={{  width:'79vw'}} >
+          <h3>Response from Backend:</h3>
+          <pre className="response-text">{responseData.replace(/`/g, '')}</pre> {/* Displaying the text directly without using JSON.stringify */}
+        </div>
+      )}
+
     </div>
   );
 };

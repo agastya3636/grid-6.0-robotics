@@ -7,7 +7,7 @@ const SpecificInfo = () => {
     <div className="wrap">
       <div className="image">
         {/* Add the ImageUpload component */}
-        <ImageUpload />
+        <ImageUpload endpoint='ocr'/>
       </div>
       <div className="description-container">
         <h2>Specific Information</h2>

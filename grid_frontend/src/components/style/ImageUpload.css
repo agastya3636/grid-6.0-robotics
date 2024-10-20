@@ -19,7 +19,7 @@
   }
   
   .upload-area.empty {
-    background-color:rgb(207, 230, 220); /* Background color when no image is selected */
+    background: #f0f0f0;; /* Background color when no image is selected */
   }
   
   button {
@@ -126,4 +126,22 @@
     font-weight: bold; /* Make it bold */
     margin-top: 10px; /* Spacing above the message */
   }
+
+    .response-text {
+      color: black;
+      white-space: pre-wrap;
+      /* Preserve whitespace and wrap text */
+      word-wrap: break-word;
+      /* Break long words */
+      overflow-wrap: break-word;
+      /* Break long words */
+      max-width: 80%;
+      /* Prevents the text from exceeding the container's width */
+      border: 1px solid #ccc;
+      /* Optional: Add a border for visibility */
+      
+      /* Optional: Add some padding */
+      background-color: #f9f9f9;
+      /* Optional: Add a background color */
+    }
   

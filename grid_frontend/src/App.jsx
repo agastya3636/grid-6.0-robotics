@@ -51,6 +51,7 @@ const styles = {
     alignItems: 'center',
     width: '100%',
     flexGrow: 1,
+    backgroundColor:'#f4e1d2',
   },
   welcome: {
     fontSize: '48px',

@@ -9,7 +9,7 @@ const Description = () => {
       <div className='wrap'>
       <div className="image">
         {/* Add the ImageUpload component */}
-        <ImageUpload />
+        <ImageUpload endpoint='ocr'/>
       </div>
       <div className="description-container">
         <h2>Description of Product</h2>

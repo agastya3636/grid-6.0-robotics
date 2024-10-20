@@ -7,7 +7,7 @@ const ObjectDetection = () => {
     <div className="wrap">
       <div className="image">
         {/* Add the ImageUpload component */}
-        <ImageUpload />
+        <ImageUpload endpoint='caption' />
       </div>
       <div className="description-container">
         <h2>Object Detection</h2>

@@ -10,10 +10,14 @@ import requests
 import os
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
+from flask import Flask
+from flask_cors import CORS
 
-# Initialize the Flask app
+
+from flask_cors import CORS
+
 app = Flask(__name__)
-
+CORS(app, resources={r"/ocr": {"origins": "http://localhost:5173"}})
 # Set the device (CPU or GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -60,6 +64,35 @@ def process_classification_image(image_bytes):
     image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     return classification_transform(image).unsqueeze(0).to(device)
 
+def gen_ans(query):
+    # API URL and API key (replace with your actual key)
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyDQz5dgbtryYd3MG_sDxfdFBPtL9JeBIPU"
+    
+    # Data to be sent (input for the language model)
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": query
+                    }
+                ]
+            }
+        ]
+    }
+
+    try:
+        # Send the POST request
+        response = requests.post(url, json=data)
+        response.raise_for_status()  # Check for HTTP errors
+
+        # Extract and print the generated response
+        generated_text = response.json()['candidates'][0]['content']
+        print(generated_text)
+        return  generated_text
+
+    except requests.exceptions.RequestException as e:
+        print("Error making request:", e) 
 
 @app.route('/caption', methods=['POST'])
 def caption_image():
@@ -85,8 +118,8 @@ def caption_image():
     # Generate caption
     out = object_detection_model.generate(**inputs)
     caption = object_detection_processor.decode(out[0], skip_special_tokens=True)
-
-    return jsonify({"caption": caption})
+    res = gen_ans(query=caption+" conert it in json also add count i.e no of perticular item")
+    return jsonify({"caption": caption,"json":res})
 
 # Route to handle OCR requests
 @app.route('/ocr', methods=['POST'])
@@ -96,18 +129,21 @@ def ocr():
 
     # Get the image from the request
     image_file = request.files['image']
+    
 
     # Save the image temporarily
     image_path = "./temp_image.webp"
+    print(image_path)
     image_file.save(image_path)
 
     # Perform OCR using the model
     try:
         # Pass the path of the saved image to the model
         res = ocr_model.chat(ocr_tokenizer, image_path, ocr_type='ocr')
-
+        final = gen_ans(query=res+"  convert this in json format")
+        print(final)
         # Return the result as a JSON response
-        return jsonify({"result": res}), 200
+        return jsonify({"result": res,"json":final}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -119,11 +155,11 @@ def ocr():
 # Route to handle image classification requests
 @app.route('/predict', methods=['POST'])
 def predict():
-    if 'file' not in request.files:
+    if 'image' not in request.files:
         return jsonify({"error": "No image provided"}), 400
 
     try:
-        file = request.files['file']
+        file = request.files['image']
         img_bytes = file.read()  # Read the image file as bytes
         image_tensor = process_classification_image(img_bytes)  # Preprocess the image
         
@@ -135,12 +171,28 @@ def predict():
         # Map predicted index to the class label
         class_idx = predicted.item()
         class_name = class_labels[class_idx]
+        response = {
+            'json': {
+                'parts': [
+                    {
+                        'text': f"""{{
+                            'class_id': {class_idx},
+                            'class_name': '{class_name}'
+                        }}"""  # Use f-strings for formatting
+                    }
+                ]
+            }
+        }
+
         
-        return jsonify({'class_id': class_idx, 'class_name': class_name})
+        return (response)
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/test', methods=['GET'])
+def test():
+    return jsonify({"message": "Test successful!"})
 
 # Main entry point
 if __name__ == '__main__':

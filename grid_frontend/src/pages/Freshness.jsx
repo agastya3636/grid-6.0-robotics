@@ -7,7 +7,7 @@ const Freshness = () => {
     <div className="wrap">
       <div className="image">
         {/* Add the ImageUpload component */}
-        <ImageUpload />
+        <ImageUpload endpoint='predict' />
       </div>
       <div className="description-container">
         <h2>Freshness Information</h2>
