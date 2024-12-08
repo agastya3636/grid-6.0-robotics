@@ -9,15 +9,71 @@ from io import BytesIO
 import requests
 import os
 from transformers import BlipProcessor, BlipForConditionalGeneration
-
+from pymongo import MongoClient
+from pydantic import BaseModel, validator
+from typing import List
+from datetime import datetime
 from flask import Flask
 from flask_cors import CORS
-
+import re
 
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app, resources={r"/ocr": {"origins": "http://localhost:5173"}})
+
+#setup database
+client = MongoClient('localhost', 27017)
+db = client['test-database']
+collection = db['test-collection']
+#setup schema 
+class Freshness(BaseModel):
+    timestamp: datetime
+    produce: str
+    freshness: int
+    expected_life_span: str
+    
+    @validator('timestamp', pre=True, always=True)
+    def set_timestamp(cls, v):
+        return v or datetime.utcnow()
+
+
+
+def extract_details(class_name):
+    try:
+        # Regex pattern to extract the produce name and the shelf life range (e.g., "5-10")
+        match = re.match(r"([a-zA-Z]+)\((\d+)-(\d+)\)", class_name)
+        
+        if match:
+            produce = match.group(1)  # Extract the produce (e.g., "Banana")
+            lower_value = int(match.group(2))  # Extract the lower value of the shelf life (e.g., 5)
+            upper_value = int(match.group(3))  # Extract the upper value of the shelf life (e.g., 10)
+            
+            # Calculate the freshness as the lower value divided by 5
+            freshness = lower_value / 5
+            
+            # Create a Freshness Pydantic model instance
+            freshness_data = Freshness(
+                produce=produce,
+                expected_life_span=f"{lower_value}-{upper_value}",
+                freshness=freshness,
+                timestamp=datetime.utcnow()  # Set the current timestamp
+            )
+
+            # Print for debugging purposes
+            print(f"Produce: {produce}, Shelf Life: {lower_value}-{upper_value}, Freshness: {freshness}")
+
+            # Insert the Freshness data into MongoDB
+            collection.insert_one(freshness_data.dict())  # Use .dict() to convert Pydantic model to a dictionary
+
+            return freshness_data.dict()  # Return the dictionary form of the model for further processing
+        else:
+            raise ValueError(f"Invalid class_name format: {class_name}")
+    
+    except Exception as e:
+        print(f"Error in extract_details: {str(e)}")
+        raise  # Re-raise the error to propagate it to the calling function
+
 # Set the device (CPU or GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -171,6 +227,18 @@ def predict():
         # Map predicted index to the class label
         class_idx = predicted.item()
         class_name = class_labels[class_idx]
+        # Debugging the class_name
+        print(f"Predicted class name: {class_name}")
+
+        # Call extract_details and handle potential errors
+        try:
+            demore = extract_details(class_name)  # Assuming extract_details is defined
+            
+            
+        except Exception as e:
+            print(f"Error in extract_details: {str(e)}")
+            return jsonify({'error': f"Error in extract_details: {str(e)}"}), 500
+        
         response = {
             'json': {
                 'parts': [
