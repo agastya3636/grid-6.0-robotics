@@ -1,3 +1,4 @@
 saved_model_GOT_OCR2_0/model.safetensors
 saved_model_GOT_OCR2_0/qwen.tiktoken
 blip-image-captioning-large-model/model.safetensors
+.env

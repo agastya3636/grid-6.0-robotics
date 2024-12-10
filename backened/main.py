@@ -17,7 +17,11 @@ from flask import Flask
 from flask_cors import CORS
 import re
 from flask_cors import CORS
+from dotenv import load_dotenv
 
+load_dotenv()
+
+gemini_password=os.getenv('GeminiPassword')
 app = Flask(__name__)
 CORS(app, resources={r"/ocr": {"origins": "http://localhost:5173"}})
 
@@ -121,7 +125,7 @@ def process_classification_image(image_bytes):
 
 def gen_ans(query):
     # API URL and API key (replace with your actual key)
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyCwSumxEudRZNhzkKGcKA1GdAvXLm_5ZfQ"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_password}"
     
     # Data to be sent (input for the language model)
     data = {
