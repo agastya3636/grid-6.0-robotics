@@ -16,7 +16,6 @@ from datetime import datetime
 from flask import Flask
 from flask_cors import CORS
 import re
-
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -26,13 +25,14 @@ CORS(app, resources={r"/ocr": {"origins": "http://localhost:5173"}})
 client = MongoClient('localhost', 27017)
 db = client['test-database']
 collection = db['test-collection']
+expiy_and_des = db['test-expiy']
+count=db['test-count']
 #setup schema 
 class Freshness(BaseModel):
     timestamp: datetime
     produce: str
     freshness: int
     expected_life_span: str
-    
     @validator('timestamp', pre=True, always=True)
     def set_timestamp(cls, v):
         return v or datetime.utcnow()
@@ -41,7 +41,6 @@ class Freshness(BaseModel):
 
 def extract_details(class_name):
     try:
-        # Regex pattern to extract the produce name and the shelf life range (e.g., "5-10")
         match = re.match(r"([a-zA-Z]+)\((\d+)-(\d+)\)", class_name)
         
         if match:
@@ -122,7 +121,7 @@ def process_classification_image(image_bytes):
 
 def gen_ans(query):
     # API URL and API key (replace with your actual key)
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyDQz5dgbtryYd3MG_sDxfdFBPtL9JeBIPU"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyCwSumxEudRZNhzkKGcKA1GdAvXLm_5ZfQ"
     
     # Data to be sent (input for the language model)
     data = {
@@ -150,6 +149,41 @@ def gen_ans(query):
     except requests.exceptions.RequestException as e:
         print("Error making request:", e) 
 
+# @app.route('/caption', methods=['POST'])
+# def caption_image():
+#     # Check if an image file is provided in the request
+#     if 'image' not in request.files:
+#         return jsonify({"error": "No image provided"}), 400
+
+#     file = request.files['image']
+#     img_bytes = file.read()  # Read the image file as bytes
+    
+#     # Open the image using PIL
+#     raw_image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+
+#     text = request.form.get('text', '')  # Optional text for conditional captioning
+
+#     if text:
+#         # Conditional captioning
+#         inputs = object_detection_processor(raw_image, text, return_tensors="pt").to("cuda")
+#     else:
+#         # Unconditional captioning
+#         inputs = object_detection_processor(raw_image, return_tensors="pt").to("cuda")
+
+#     # Generate caption
+#     out = object_detection_model.generate(**inputs)
+#     caption = object_detection_processor.decode(out[0], skip_special_tokens=True)
+#     res = gen_ans(query=caption+" conert it in json also add count i.e no of perticular item")
+#     #store in database
+#     if res:
+#         try:
+#             # Insert the Freshness data into MongoDB
+#             count.insert_one(res.parts[0])  # Use .dict() to convert Pydantic model to a dictionary
+#             return jsonify({"caption": caption,"json":res})
+#         except Exception as e:
+#             print(f"Error in extract_details: {str(e)}")
+#             return jsonify({'error': f"Error in extract_details: {str(e)}"}), 500
+    
 @app.route('/caption', methods=['POST'])
 def caption_image():
     # Check if an image file is provided in the request
@@ -158,26 +192,88 @@ def caption_image():
 
     file = request.files['image']
     img_bytes = file.read()  # Read the image file as bytes
-    
-    # Open the image using PIL
-    raw_image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
 
-    text = request.form.get('text', '')  # Optional text for conditional captioning
+    try:
+        # Open the image using PIL
+        raw_image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
 
-    if text:
-        # Conditional captioning
-        inputs = object_detection_processor(raw_image, text, return_tensors="pt").to("cuda")
-    else:
-        # Unconditional captioning
-        inputs = object_detection_processor(raw_image, return_tensors="pt").to("cuda")
+        # Optional text for conditional captioning
+        text = request.form.get('text', '')
 
-    # Generate caption
-    out = object_detection_model.generate(**inputs)
-    caption = object_detection_processor.decode(out[0], skip_special_tokens=True)
-    res = gen_ans(query=caption+" conert it in json also add count i.e no of perticular item")
-    return jsonify({"caption": caption,"json":res})
+        if text:
+            # Conditional captioning
+            inputs = object_detection_processor(raw_image, text, return_tensors="pt").to("cuda")
+        else:
+            # Unconditional captioning
+            inputs = object_detection_processor(raw_image, return_tensors="pt").to("cuda")
+
+        # Generate caption
+        out = object_detection_model.generate(**inputs)
+        caption = object_detection_processor.decode(out[0], skip_special_tokens=True)
+
+        # Call gen_ans to process the caption
+        res = gen_ans(query=caption + " convert it in json also add count i.e no of particular item and dont give me comment only the json data")
+
+        if res:
+            try:
+                # Convert `res` to a dictionary if it's not already
+                json_data = json.loads(res) if isinstance(res, str) else res
+                g={"caption": caption, "json": json_data}
+                # Insert the JSON data into MongoDB
+                count.insert_one(g)
+
+                return jsonify({"caption": caption, "json": json_data}), 200
+            except Exception as e:
+                print(f"Error in MongoDB insertion: {str(e)}")
+                return jsonify({'error': f"Error in MongoDB insertion: {str(e)}"}), 500
+        else:
+            return jsonify({"caption": caption, "json": None}), 200
+    except Exception as e:
+        print(f"Error in image captioning: {str(e)}")
+        return jsonify({"error": f"Error in image captioning: {str(e)}"}), 500
+
 
 # Route to handle OCR requests
+# @app.route('/ocr', methods=['POST'])
+# def ocr():
+#     if 'image' not in request.files:
+#         return jsonify({"error": "No image provided"}), 400
+
+#     # Get the image from the request
+#     image_file = request.files['image']
+    
+
+#     # Save the image temporarily
+#     image_path = "./temp_image.webp"
+#     print(image_path)
+#     image_file.save(image_path)
+
+#     # Perform OCR using the model
+#     try:
+#         # Pass the path of the saved image to the model
+#         res = ocr_model.chat(ocr_tokenizer, image_path, ocr_type='ocr')
+#         print(res)
+#         final = gen_ans(query=res+" convert this in json format if expiry date is present the give following also Brand , Expiry date , Expired(yes/no) ,Expected life span (Days) dont add json as heading give only json")
+#         print(final)
+#         if(final):
+#             try:
+#                 # Insert the Freshness data into MongoDB
+#                 g=jsonify({"result": res,"json":final})
+#                 expiy_and_des.insert_one(g)  # Use .dict() to convert Pydantic model to a dictionary
+#                 return jsonify({"result": res,"json":final}),200
+#             except Exception as e:
+#                 print(f"Error in extract_details: {str(e)}")
+#                 return jsonify({'error': f"Error in extract_details: {str(e)}"}), 500
+#         else:
+#             return jsonify({"result": res}),200
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+#     finally:
+#         # Clean up the temporary image file
+#         if os.path.exists(image_path):
+#             os.remove(image_path)
+#         print("Cleanup completed.")
+
 @app.route('/ocr', methods=['POST'])
 def ocr():
     if 'image' not in request.files:
@@ -186,7 +282,6 @@ def ocr():
     # Get the image from the request
     image_file = request.files['image']
     
-
     # Save the image temporarily
     image_path = "./temp_image.webp"
     print(image_path)
@@ -196,10 +291,23 @@ def ocr():
     try:
         # Pass the path of the saved image to the model
         res = ocr_model.chat(ocr_tokenizer, image_path, ocr_type='ocr')
-        final = gen_ans(query=res+"  convert this in json format")
-        print(final)
-        # Return the result as a JSON response
-        return jsonify({"result": res,"json":final}), 200
+        print(res)
+        final = gen_ans(query=res+" convert this in json format if expiry date is present the give following also Brand , Expiry date , Expired(yes/no) ,Expected life span (Days) dont add json as heading give only json")
+        # print(final)
+        if final:
+            try:
+                # Convert `final` to a dictionary if it is not already
+                final_json = json.loads(final) if isinstance(final, str) else final
+                
+                # Insert the Freshness data into MongoDB
+                document = {"result": res, "json": final_json}
+                expiy_and_des.insert_one(document)  # Insert dictionary into MongoDB
+                return jsonify({"result": res, "json": final_json}), 200
+            except Exception as e:
+                print(f"Error in extract_details: {str(e)}")
+                return jsonify({'error': f"Error in extract_details: {str(e)}"}), 500
+        else:
+            return jsonify({"result": res}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -207,6 +315,7 @@ def ocr():
         if os.path.exists(image_path):
             os.remove(image_path)
         print("Cleanup completed.")
+
 
 # Route to handle image classification requests
 @app.route('/predict', methods=['POST'])
@@ -227,10 +336,6 @@ def predict():
         # Map predicted index to the class label
         class_idx = predicted.item()
         class_name = class_labels[class_idx]
-        # Debugging the class_name
-        print(f"Predicted class name: {class_name}")
-
-        # Call extract_details and handle potential errors
         try:
             demore = extract_details(class_name)  # Assuming extract_details is defined
             
@@ -243,10 +348,7 @@ def predict():
             'json': {
                 'parts': [
                     {
-                        'text': f"""{{
-                            'class_id': {class_idx},
-                            'class_name': '{class_name}'
-                        }}"""  # Use f-strings for formatting
+                        'text': f"""{demore}""" 
                     }
                 ]
             }
